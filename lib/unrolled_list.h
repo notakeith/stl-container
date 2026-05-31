@@ -134,7 +134,12 @@ class unrolled_list {
         return reverse_iterator(iterator(tail_, tail_->size_));
     }
     reverse_iterator rend() { return reverse_iterator(begin()); }
-    const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator rbegin() const {
+        if (tail_ == nullptr) {
+            return const_reverse_iterator(cend());
+        }
+        return const_reverse_iterator(const_iterator(tail_, tail_->size_));
+    }
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
     const_reverse_iterator crbegin() const { return const_reverse_iterator(cend()); }
     const_reverse_iterator crend() const { return const_reverse_iterator(cbegin()); }
@@ -168,7 +173,7 @@ class unrolled_list {
     }
 
     unrolled_list()
-        : head_(nullptr), tail_(nullptr), size_(0), node_qt_(0) {
+        : head_(nullptr), tail_(nullptr), size_(0), node_qt_(1) {
         Node* ptr = NodeAllocatorTraits::allocate(node_allocator_, 1);
         NodeAllocatorTraits::construct(node_allocator_, ptr);
         head_ = ptr;
@@ -184,7 +189,7 @@ class unrolled_list {
             head_ = ptr;
             tail_ = ptr;
             size_ = 0;
-            node_qt_ = 0;
+            node_qt_ = 1;
             for (; first != last; ++first) {
                 if (tail_->size_ < NodeMaxSize) {
                     new (tail_->array_ + tail_->size_) T(*first);
@@ -198,13 +203,13 @@ class unrolled_list {
                         new_node->prev_ = tail_;
                         tail_->next_ = new_node;
                         tail_ = new_node;
+                        node_qt_++;
                     } catch (...) {
                         NodeAllocatorTraits::deallocate(node_allocator_, new_node, 1);
                         throw;
                     }
                 }
                 size_++;
-                ;
             }
         } catch (...) {
             if (head_) {
@@ -221,7 +226,7 @@ class unrolled_list {
         head_ = ptr;
         tail_ = ptr;
         size_ = 0;
-        node_qt_ = 0;
+        node_qt_ = 1;
 
         for (size_type i = 0; i < count; ++i) {
             push_back(value);
@@ -229,7 +234,7 @@ class unrolled_list {
     }
 
     unrolled_list(const Allocator& alloc)
-        : head_(nullptr), tail_(nullptr), size_(0), node_qt_(0), allocator_(alloc), node_allocator_(alloc) {
+        : head_(nullptr), tail_(nullptr), size_(0), node_qt_(1), allocator_(alloc), node_allocator_(alloc) {
         Node* ptr = NodeAllocatorTraits::allocate(node_allocator_, 1);
         NodeAllocatorTraits::construct(node_allocator_, ptr, allocator_);
         head_ = ptr;
@@ -252,7 +257,7 @@ class unrolled_list {
     }
 
     unrolled_list(const unrolled_list& other, const Allocator& alloc)
-        : allocator_(alloc), node_allocator_(alloc) {
+        : unrolled_list(alloc) {
         for (const auto& item : other) {
             push_back(item);
         }
@@ -291,7 +296,7 @@ class unrolled_list {
         head_ = ptr;
         tail_ = ptr;
         size_ = 0;
-        node_qt_ = 0;
+        node_qt_ = 1;
         for (const auto& item : il) {
             push_back(item);
         }
@@ -344,7 +349,7 @@ class unrolled_list {
         return size_ == 0;
     }
 
-    size_type size() {
+    size_type size() const {
         return size_;
     }
 
@@ -377,6 +382,7 @@ class unrolled_list {
                 new_node->prev_ = tail_;
                 tail_->next_ = new_node;
                 tail_ = new_node;
+                node_qt_++;
             } catch (...) {
                 NodeAllocatorTraits::deallocate(node_allocator_, new_node, 1);
                 throw;
@@ -400,6 +406,7 @@ class unrolled_list {
             } else {
                 head_ = tail_ = nullptr;
             }
+            node_qt_--;
         }
         size_--;
     }
@@ -421,6 +428,7 @@ class unrolled_list {
                 new_node->next_ = head_;
                 head_->prev_ = new_node;
                 head_ = new_node;
+                node_qt_++;
             } catch (...) {
                 NodeAllocatorTraits::deallocate(node_allocator_, new_node, 1);
                 throw;
@@ -448,6 +456,7 @@ class unrolled_list {
             } else {
                 head_ = tail_ = nullptr;
             }
+            node_qt_--;
         }
         size_--;
     }
@@ -461,6 +470,7 @@ class unrolled_list {
 
         if (index == 0) {
             push_front(value);
+            return;
         }
 
         while (current && index >= node_index + current->size_) {
@@ -523,6 +533,7 @@ class unrolled_list {
                 if (current == tail_) {
                     tail_ = new_node;
                 }
+                node_qt_++;
             } catch (...) {
                 NodeAllocatorTraits::deallocate(node_allocator_, new_node, 1);
                 throw;
@@ -621,6 +632,7 @@ class unrolled_list {
             }
             NodeAllocatorTraits::destroy(node_allocator_, current);
             NodeAllocatorTraits::deallocate(node_allocator_, current, 1);
+            node_qt_--;
         }
 
         size_--;
